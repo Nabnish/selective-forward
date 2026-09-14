@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8" /><title>SFU test</title></head>
+<body>
+  <h2>SFU skeleton test</h2>
+  <div id="log" style="font-family: monospace; white-space: pre-wrap;"></div>
+
+  <script>
+    const logEl = document.getElementById('log');
+    function log(...args) {
+      console.log(...args);
+      logEl.textContent += args.join(' ') + '\n';
+    }
+
+    const ws = new WebSocket(`ws://${location.host}/ws`);
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+    });
+
+    pc.onconnectionstatechange = () => log('connection state:', pc.connectionState);
+    pc.oniceconnectionstatechange = () => log('ice state:', pc.iceConnectionState);
+
+    ws.onmessage = async (msg) => {
+      const m = JSON.parse(msg.data);
+      log('received event:', m.event);
+      if (m.event === 'answer') {
+        await pc.setRemoteDescription(m.data);
+        log('set remote answer');
+      }
+    };
+
+    ws.onopen = async () => {
+      log('ws open');
+
+      // dummy data channel just so the offer has an m-line to negotiate —
+      // real media tracks come in the next step
+      pc.createDataChannel('probe');
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      ws.send(JSON.stringify({ event: 'offer', data: pc.localDescription }));
+      log('sent offer');
+    };
+  </script>
+</body>
+</html>
