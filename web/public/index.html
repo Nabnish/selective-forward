@@ -1,6 +1,11 @@
 <!doctype html>
 <html>
-<head><meta charset="utf-8" /><title>SFU test</title></head>
+
+<head>
+  <meta charset="utf-8" />
+  <title>SFU test</title>
+</head>
+
 <body>
   <h2>SFU skeleton test</h2>
   <div id="log" style="font-family: monospace; white-space: pre-wrap;"></div>
@@ -26,15 +31,25 @@
       if (m.event === 'answer') {
         await pc.setRemoteDescription(m.data);
         log('set remote answer');
+      } else if (m.event === 'candidate') {
+        try {
+          await pc.addIceCandidate(m.data);
+        } catch (err) {
+          log('addIceCandidate error', err);
+        }
+      }
+    };
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        ws.send(JSON.stringify({ event: 'candidate', data: e.candidate.toJSON() }));
       }
     };
 
     ws.onopen = async () => {
-      log('ws open');
+      log('ws open, requesting camera...');
 
-      // dummy data channel just so the offer has an m-line to negotiate —
-      // real media tracks come in the next step
-      pc.createDataChannel('probe');
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
@@ -43,4 +58,5 @@
     };
   </script>
 </body>
+
 </html>
